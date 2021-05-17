@@ -149,54 +149,57 @@ Producer::populateStore(std::istream& is)
   if (!m_options.isQuiet)
     std::cerr << "Loading input ..." << std::endl;
 
-  std::vector<uint8_t> buffer(m_options.maxSegmentSize - 32);
-  while (is.good()) {
-    is.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
+  is.seekg(0, is.end);
+  int end_pos = is.tellg();
+  if(end_pos < 1) {
+    std::cerr << "Data empty" << std::endl;
+    return;
+  }
+
+  int chunkSize = end_pos / m_options.maxSegmentSize;
+  int lastDataSize = end_pos % m_options.maxSegmentSize;
+  auto finalBlockId = name::Component::fromSegment(chunkSize);
+
+  std::vector<uint8_t> buffer(m_options.maxSegmentSize);
+  Block nextHash(tlv::SignatureValue);
+
+  m_startTime = time::steady_clock::now();
+
+  for(int count = 0; count <= chunkSize; count++) {
+    if(count == 0) {
+      is.seekg(end_pos - lastDataSize);
+      is.read(reinterpret_cast<char *>(buffer.data()), lastDataSize);     
+    } else {
+      is.seekg(end_pos - lastDataSize - buffer.size() * count);
+      is.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
+    }
+
     const auto nCharsRead = is.gcount();
 
-    if (nCharsRead > 0) {
-      auto data = make_shared<Data>(Name(m_versionedPrefix).appendSegment(m_store.size()));
+    if(nCharsRead > 0) {
+      auto data = make_shared<Data>(Name(m_versionedPrefix).appendSegment(chunkSize - count));
       data->setFreshnessPeriod(m_options.freshnessPeriod);
       Block content(tlv::Content);
       Block realContent = makeBinaryBlock(tlv::Content, buffer.data(), nCharsRead);
       content.push_back(realContent);
+      content.push_back(nextHash);
       data->setContent(content);
+      data->setFinalBlock(finalBlockId);
 
-      // data->setContent(buffer.data(), static_cast<size_t>(nCharsRead));
-      m_store.push_back(data);
-    }
-  }
+      if(count == chunkSize) {
+        m_keyChain.sign(*data);
+      } else {
+        m_keyChain.sign(*data, ndn::signingWithSha256());
+      }
+      nextHash = data->getSignatureValue();
 
-
-  if (m_store.empty()) {
-    auto data = make_shared<Data>(Name(m_versionedPrefix).appendSegment(0));
-    data->setFreshnessPeriod(m_options.freshnessPeriod);
-    m_store.push_back(data);
-  }
-
-  m_startTime = time::steady_clock::now();
-
-  auto finalBlockId = name::Component::fromSegment(m_store.size() - 1);
-
-  Block nextHash(tlv::SignatureValue);
-  for (auto it = m_store.rbegin(); it != m_store.rend(); it++) {
-    Data& data = **it;
-    data.setFinalBlock(finalBlockId); 
-
-    auto content = data.getContent();
-    content.push_back(nextHash);
-
-    data.setContent(content);
-
-    if (it == m_store.rend() - 1) {
-      m_keyChain.sign(data);
+      m_store.insert(m_store.begin(), data);
     } else {
-      m_keyChain.sign(data, ndn::signingWithSha256());
+      std::cerr << "Data read failed" << std::endl;
+      return;
     }
-
-    nextHash = data.getSignatureValue(); //32byte
   }
-  
+
   boost::chrono::duration<double, boost::chrono::seconds::period> timeElapsed = time::steady_clock::now() - m_startTime;
   
   std::cout << "Time elapsed: " << timeElapsed << std::endl;
