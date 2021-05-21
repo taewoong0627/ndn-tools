@@ -36,7 +36,7 @@
 namespace ndn {
 namespace chunks {
 
-Producer::Producer(const Name& prefix, Face& face, KeyChain& keyChain, std::istream& is,
+Producer::Producer(const Name& prefix, Face& face, HCKeyChain& keyChain, std::istream& is,
                    const Options& opts)
   : m_face(face)
   , m_keyChain(keyChain)
@@ -97,7 +97,7 @@ Producer::processDiscoveryInterest(const Interest& interest)
   mobject.setVersionedName(m_versionedPrefix);
 
   // make a metadata packet based on the received discovery Interest name
-  Data mdata(mobject.makeData(interest.getName(), m_keyChain, m_options.signingInfo));
+  Data mdata(mobject.makeData(interest.getName(), (KeyChain&)m_keyChain, m_options.signingInfo)); 
 
   if (m_options.isVerbose)
     std::cerr << "Sending metadata: " << mdata << std::endl;
@@ -182,15 +182,15 @@ Producer::populateStore(std::istream& is)
       Block content(tlv::Content);
       Block realContent = makeBinaryBlock(tlv::Content, buffer.data(), nCharsRead);
       content.push_back(realContent);
-      content.push_back(nextHash);
       data->setContent(content);
       data->setFinalBlock(finalBlockId);
 
       if(count == chunkSize) {
-        m_keyChain.sign(*data);
+        m_keyChain.sign(*data, nextHash);
       } else {
-        m_keyChain.sign(*data, ndn::signingWithSha256());
+        m_keyChain.sign(*data, nextHash, ndn::signingWithSha256());
       }
+
       nextHash = data->getSignatureValue();
 
       m_store.insert(m_store.begin(), data);

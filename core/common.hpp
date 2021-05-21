@@ -58,6 +58,7 @@
 #include <ndn-cxx/interest.hpp>
 #include <ndn-cxx/name.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
+#include <ndn-cxx/security/hc-key-chain.hpp>
 #include <ndn-cxx/util/backports.hpp>
 #include <ndn-cxx/util/exception.hpp>
 #include <ndn-cxx/util/scheduler.hpp>

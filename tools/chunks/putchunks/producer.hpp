@@ -62,7 +62,7 @@ public:
    * @param prefix prefix used to publish data; if the last component is not a valid
    *               version number, the current system time is used as version number.
    */
-  Producer(const Name& prefix, Face& face, KeyChain& keyChain, std::istream& is,
+  Producer(const Name& prefix, Face& face, HCKeyChain& keyChain, std::istream& is,
            const Options& opts);
 
   /**
@@ -107,7 +107,7 @@ private:
   Name m_prefix;
   Name m_versionedPrefix;
   Face& m_face;
-  KeyChain& m_keyChain;
+  HCKeyChain& m_keyChain;
   const Options m_options;
   
   time::steady_clock::TimePoint m_startTime;

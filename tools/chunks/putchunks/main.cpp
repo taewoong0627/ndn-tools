@@ -138,8 +138,8 @@ main(int argc, char* argv[])
 
   try {
     Face face;
-    KeyChain keyChain;
-    Producer producer(prefix, face, keyChain, std::cin, opts);
+    HCKeyChain hcKeyChain;
+    Producer producer(prefix, face, hcKeyChain, std::cin, opts);
     producer.run();
   }
   catch (const std::exception& e) {
